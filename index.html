@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proiect Individual - Generator de Albume Foto</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0284c7',
+                            600: '#0369a1',
+                            700: '#075985',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        serif: ['Playfair Display', 'serif'],
+                        handwriting: ['Caveat', 'cursive'],
+                    }
+                }
+            }
+        }
+    </script>
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@600&family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;1,400&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        @media print {
+            body { background: white !important; color: black !important; }
+            .no-print { display: none !important; }
+            .print-page { 
+                page-break-after: always; 
+                box-shadow: none !important;
+                border: none !important;
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+            }
+        }
+
+        .filter-normal { filter: none; }
+        .filter-grayscale { filter: grayscale(100%); }
+        .filter-sepia { filter: sepia(100%); }
+        .filter-vintage { filter: sepia(50%) hue-rotate(-30deg) saturate(140%) contrast(90%); }
+        .filter-warm { filter: sepia(30%) saturate(140%) brightness(105%); }
+        .filter-contrast { filter: contrast(160%) brightness(95%); }
+        .filter-dramatic { filter: contrast(180%) grayscale(40%); }
+
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+        .dark ::-webkit-scrollbar-thumb { background: #334155; }
+    </style>
+</head>
+<body class="bg-slate-100 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-screen transition-colors duration-200">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const PRESET_IMAGES = [
+            { id: 'p1', category: 'Natură', title: 'Apus Montan', url: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?auto=format&fit=crop&w=800&q=80' },
+            { id: 'p2', category: 'Natură', title: 'Pădure de Mesteacăn', url: 'https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=800&q=80' },
+            { id: 'p3', category: 'Natură', title: 'Plajă Ocean', url: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=800&q=80' },
+            { id: 'p4', category: 'Arhitectură', title: 'Turn Istoric', url: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=800&q=80' },
+            { id: 'p5', category: 'Arhitectură', title: 'Pod Modern', url: 'https://images.unsplash.com/photo-1451976426598-a7593bd6d0b2?auto=format&fit=crop&w=800&q=80' },
+            { id: 'p6', category: 'Evenimente', title: 'Festival de Lumini', url: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?auto=format&fit=crop&w=800&q=80' },
+            { id: 'p7', category: 'Evenimente', title: 'Petrecere Aniversară', url: 'https://images.unsplash.com/photo-1530103862676-de8c9debad1d?auto=format&fit=crop&w=800&q=80' },
+            { id: 'p8', category: 'Călătorii', title: 'Oraș Vechi', url: 'https://images.unsplash.com/photo-1467269204594-9661b134dd2b?auto=format&fit=crop&w=800&q=80' },
+        ];
+
+        const INITIAL_ALBUM = {
+            title: "Albumul Meu de Amintiri",
+            subtitle: "Proiect Individual - Galerie Foto Personala",
+            themeColor: "indigo",
+            coverLayout: "modern",
+            layoutType: "grid",
+            pages: [
+                {
+                    id: 'page-1',
+                    title: 'Pagină 1 - Peisaje & Călătorii',
+                    photos: [
+                        { id: 'img-1', url: PRESET_IMAGES[0].url, caption: 'Apus superb în munți', filter: 'filter-normal', rotation: 0 },
+                        { id: 'img-2', url: PRESET_IMAGES[1].url, caption: 'Liniștea pădurii', filter: 'filter-warm', rotation: 0 },
+                        { id: 'img-3', url: PRESET_IMAGES[2].url, caption: 'Vacanța la mare', filter: 'filter-vintage', rotation: 0 }
+                    ]
+                }
+            ]
+        };
+
+        function App() {
+            const [album, setAlbum] = useState(() => {
+                const saved = localStorage.getItem('photo_album_data');
+                return saved ? JSON.parse(saved) : INITIAL_ALBUM;
+            });
+            const [darkMode, setDarkMode] = useState(false);
+            const [activePageIdx, setActivePageIdx] = useState(0);
+            const [editingPhoto, setEditingPhoto] = useState(null);
+            const [slideshowActive, setSlideshowActive] = useState(false);
+            const [slideshowIdx, setSlideshowIdx] = useState(0);
+            const [activeTab, setActiveTab] = useState('editor');
+
+            useEffect(() => {
+                localStorage.setItem('photo_album_data', JSON.stringify(album));
+            }, [album]);
+
+            useEffect(() => {
+                if (darkMode) {
+                    document.documentElement.classList.add('dark');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                }
+            }, [darkMode]);
+
+            const allPhotos = album.pages.flatMap(p => p.photos);
+
+            const addPage = () => {
+                const newPage = {
+                    id: `page-${Date.now()}`,
+                    title: `Pagină ${album.pages.length + 1}`,
+                    photos: []
+                };
+                setAlbum({ ...album, pages: [...album.pages, newPage] });
+                setActivePageIdx(album.pages.length);
+            };
+
+            const deletePage = (index) => {
+                if (album.pages.length <= 1) {
+                    alert("Albumul trebuie să conțină cel puțin o pagină!");
+                    return;
+                }
+                const updatedPages = album.pages.filter((_, idx) => idx !== index);
+                setAlbum({ ...album, pages: updatedPages });
+                setActivePageIdx(Math.max(0, index - 1));
+            };
+
+            const handleFileUpload = (e) => {
+                const files = Array.from(e.target.files);
+                if (!files.length) return;
+
+                files.forEach(file => {
+                    const reader = new FileReader();
+                    reader.onload = (uploadEvent) => {
+                        const newPhoto = {
+                            id: `img-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+                            url: uploadEvent.target.result,
+                            caption: file.name.replace(/\.[^/.]+$/, ""),
+                            filter: 'filter-normal',
+                            rotation: 0
+                        };
+                        addPhotoToCurrentPage(newPhoto);
+                    };
+                    reader.readAsDataURL(file);
+                });
+            };
+
+            const addPresetPhoto = (preset) => {
+                const newPhoto = {
+                    id: `img-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+                    url: preset.url,
+                    caption: preset.title,
+                    filter: 'filter-normal',
+                    rotation: 0
+                };
+                addPhotoToCurrentPage(newPhoto);
+            };
+
+            const addPhotoToCurrentPage = (photo) => {
+                const updatedPages = [...album.pages];
+                if (!updatedPages[activePageIdx]) return;
+                updatedPages[activePageIdx].photos.push(photo);
+                setAlbum({ ...album, pages: updatedPages });
+            };
+
+            const updatePhoto = (photoId, updatedProps) => {
+                const updatedPages = album.pages.map(page => ({
+                    ...page,
+                    photos: page.photos.map(p => p.id === photoId ? { ...p, ...updatedProps } : p)
+                }));
+                setAlbum({ ...album, pages: updatedPages });
+                if (editingPhoto && editingPhoto.id === photoId) {
+                    setEditingPhoto(prev => ({ ...prev, ...updatedProps }));
+                }
+            };
+
+            const deletePhoto = (photoId) => {
+                const updatedPages = album.pages.map(page => ({
+                    ...page,
+                    photos: page.photos.filter(p => p.id !== photoId)
+                }));
+                setAlbum({ ...album, pages: updatedPages });
+                if (editingPhoto && editingPhoto.id === photoId) {
+                    setEditingPhoto(null);
+                }
+            };
+
+            const movePhoto = (pageIdx, photoIdx, direction) => {
+                const page = album.pages[pageIdx];
+                const newPhotos = [...page.photos];
+                const targetIdx = photoIdx + direction;
+
+                if (targetIdx < 0 || targetIdx >= newPhotos.length) return;
+
+                const temp = newPhotos[photoIdx];
+                newPhotos[photoIdx] = newPhotos[targetIdx];
+                newPhotos[targetIdx] = temp;
+
+                const updatedPages = [...album.pages];
+                updatedPages[pageIdx].photos = newPhotos;
+                setAlbum({ ...album, pages: updatedPages });
+            };
+
+            const exportJSON = () => {
+                const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(album, null, 2));
+                const downloadAnchor = document.createElement('a');
+                downloadAnchor.setAttribute("href", dataStr);
+                downloadAnchor.setAttribute("download", `${album.title.replace(/\s+/g, '_')}_backup.json`);
+                document.body.appendChild(downloadAnchor);
+                downloadAnchor.click();
+                downloadAnchor.remove();
+            };
+
+            const importJSON = (e) => {
+                const fileReader = new FileReader();
+                fileReader.onload = (event) => {
+                    try {
+                        const parsed = JSON.parse(event.target.result);
+                        if (parsed.pages && Array.isArray(parsed.pages)) {
+                            setAlbum(parsed);
+                            alert("Albumul a fost importat cu succes!");
+                        } else {
+                            alert("Fișierul JSON nu are o structură validă de album.");
+                        }
+                    } catch (err) {
+                        alert("Eroare la citirea fișierului JSON.");
+                    }
+                };
+                if (e.target.files[0]) {
+                    fileReader.readAsText(e.target.files[0]);
+                }
+            };
+
+            return (
+                <div className="min-h-screen flex flex-col">
+                    <header className="no-print bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 sticky top-0 z-30 shadow-sm">
+                        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between flex-wrap gap-3">
+                            <div className="flex items-center space-x-3">
+                                <div className="p-2 bg-brand-500 text-white rounded-lg shadow-md">
+                                    <i className="fa-solid fa-book-open text-xl"></i>
+                                </div>
+                                <div>
+                                    <h1 className="font-bold text-lg leading-tight text-slate-800 dark:text-white">Proiect Individual</h1>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">Generator de Albume Foto</p>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center space-x-2">
+                                <button 
+                                    onClick={() => setSlideshowActive(true)}
+                                    disabled={allPhotos.length === 0}
+                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm font-medium rounded-lg flex items-center gap-1.5 transition"
+                                    title="Pornire Prezentare Fullscreen"
+                                >
+                                    <i className="fa-solid fa-play"></i>
+                                    <span className="hidden sm:inline">Prezentare</span>
+                                </button>
+                                <button 
+                                    onClick={() => window.print()} 
+                                    className="px-3 py-1.5 bg-slate-700 hover:bg-slate-800 text-white text-sm font-medium rounded-lg flex items-center gap-1.5 transition"
+                                    title="Imprimare sau Export PDF"
+                                >
+                                    <i className="fa-solid fa-print"></i>
+                                    <span className="hidden sm:inline">Print / PDF</span>
+                                </button>
+                                <button 
+                                    onClick={exportJSON} 
+                                    className="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-sm font-medium rounded-lg flex items-center gap-1.5 transition"
+                                    title="Descarcă datele albumului"
+                                >
+                                    <i className="fa-solid fa-download"></i>
+                                    <span className="hidden sm:inline">Export JSON</span>
+                                </button>
+                                <label className="px-3 py-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-sm font-medium rounded-lg flex items-center gap-1.5 cursor-pointer transition">
+                                    <i className="fa-solid fa-upload"></i>
+                                    <span className="hidden sm:inline">Import</span>
+                                    <input type="file" accept=".json" onChange={importJSON} className="hidden" />
+                                </label>
+                                <button 
+                                    onClick={() => setDarkMode(!darkMode)} 
+                                    className="p-2 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600 transition"
+                                    title="Schimbă Tema Întunecat/Luminos"
+                                >
+                                    <i className={`fa-solid ${darkMode ? 'fa-sun' : 'fa-moon'}`}></i>
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    <div className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        <div className="no-print lg:col-span-4 space-y-6">
+                            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm p-1 flex border border-slate-200 dark:border-slate-700">
+                                <button 
+                                    onClick={() => setActiveTab('editor')}
+                                    className={`flex-1 py-2 text-xs md:text-sm font-medium rounded-lg transition ${activeTab === 'editor' ? 'bg-brand-500 text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'}`}
+                                >
+                                    <i className="fa-solid fa-plus-circle mr-1.5"></i>Adaugă Foto
+                                </button>
+                                <button 
+                                    onClick={() => setActiveTab('presets')}
+                                    className={`flex-1 py-2 text-xs md:text-sm font-medium rounded-lg transition ${activeTab === 'presets' ? 'bg-brand-500 text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'}`}
+                                >
+                                    <i className="fa-solid fa-images mr-1.5"></i>Galerie Preset
+                                </button>
+                                <button 
+                                    onClick={() => setActiveTab('settings')}
+                                    className={`flex-1 py-2 text-xs md:text-sm font-medium rounded-lg transition ${activeTab === 'settings' ? 'bg-brand-500 text-white shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900'}`}
+                                >
+                                    <i className="fa-solid fa-sliders mr-1.5"></i>Setări
+                                </button>
+                            </div>
+
+                            {activeTab === 'editor' && (
+                                <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+                                    <h2 className="font-semibold text-slate-800 dark:text-white flex items-center gap-2">
+                                        <i className="fa-solid fa-cloud-arrow-up text-brand-500"></i>
+                                        Încărcare Fotografii Locale
+                                    </h2>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                                        Selectează imagini de pe calculatorul tău pentru a le adăuga în pagina curentă (<b>{album.pages[activePageIdx]?.title}</b>).
+                                    </p>
+                                    <label className="border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-brand-500 dark:hover:border-brand-500 rounded-xl p-6 flex flex-col items-center justify-center cursor-pointer transition group bg-slate-50 dark:bg-slate-800/50">
+                                        <i className="fa-solid fa-images text-3xl text-slate-400 group-hover:text-brand-500 mb-2 transition"></i>
+                                        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Apasă pentru a alege imagini</span>
+                                        <span className="text-xs text-slate-400 mt-1">PNG, JPG, WEBP admise</span>
+                                        <input type="file" multiple accept="image/*" onChange={handleFileUpload} className="hidden" />
+                                    </label>
+                                </div>
+                            )}
+
+                            {activeTab === 'presets' && (
+                                <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+                                    <h2 className="font-semibold text-slate-800 dark:text-white flex items-center gap-2">
+                                        <i className="fa-solid fa-photo-film text-brand-500"></i>
+                                        Librărie Imagini Demo
+                                    </h2>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">
+                                        Apasă pe oricare imagine de mai jos pentru a o adăuga instant pe pagina activă.
+                                    </p>
+                                    <div className="grid grid-cols-2 gap-2.5 max-h-96 overflow-y-auto pr-1">
+                                        {PRESET_IMAGES.map((preset) => (
+                                            <div 
+                                                key={preset.id} 
+                                                onClick={() => addPresetPhoto(preset)}
+                                                className="group relative cursor-pointer overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 hover:shadow-md transition"
+                                            >
+                                                <img src={preset.url} alt={preset.title} className="w-full h-24 object-cover group-hover:scale-105 transition duration-300" />
+                                                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-medium transition">
+                                                    <i className="fa-solid fa-plus mr-1"></i> Adaugă
+                                                </div>
+                                                <span className="absolute bottom-1 left-1 right-1 bg-black/60 text-white text-[10px] px-1.5 py-0.5 rounded truncate">
+                                                    {preset.title}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 'settings' && (
+                                <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+                                    <h2 className="font-semibold text-slate-800 dark:text-white flex items-center gap-2">
+                                        <i className="fa-solid fa-gear text-brand-500"></i>
+                                        Configurare Album
+                                    </h2>
+
+                                    <div className="space-y-3">
+                                        <div>
+                                            <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">Titlu Album</label>
+                                            <input 
+                                                type="text" 
+                                                value={album.title} 
+                                                onChange={(e) => setAlbum({ ...album, title: e.target.value })}
+                                                className="w-full px-3 py-2 text-sm border rounded-lg bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-brand-500 outline-none"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">Subtitlu / Descriere</label>
+                                            <input 
+                                                type="text" 
+                                                value={album.subtitle} 
+                                                onChange={(e) => setAlbum({ ...album, subtitle: e.target.value })}
+                                                className="w-full px-3 py-2 text-sm border rounded-lg bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-brand-500 outline-none"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5">Model / Layout Pagini</label>
+                                        <select 
+                                            value={album.layoutType} 
+                                            onChange={(e) => setAlbum({ ...album, layoutType: e.target.value })}
+                                            className="w-full px-3 py-2 text-sm border rounded-lg bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-brand-500 outline-none"
+                                        >
+                                            <option value="grid">Grid Clasic (Grilă Uniformă)</option>
+                                            <option value="magazine">Revistă Editorială</option>
+                                            <option value="polaroid">Polaroid / Retro Minimalist</option>
+                                            <option value="masonry">Masonry Gallery</option>
+                                            <option value="scrapbook">Scrapbook / Colaj Liber</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5">Teme / Culori Copertă</label>
+                                        <div className="flex gap-2">
+                                            {[
+                                                { id: 'indigo', bg: 'bg-indigo-600' },
+                                                { id: 'emerald', bg: 'bg-emerald-600' },
+                                                { id: 'rose', bg: 'bg-rose-600' },
+                                                { id: 'amber', bg: 'bg-amber-600' },
+                                                { id: 'slate', bg: 'bg-slate-800' },
+                                            ].map(color => (
+                                                <button 
+                                                    key={color.id} 
+                                                    onClick={() => setAlbum({ ...album, themeColor: color.id })}
+                                                    className={`w-8 h-8 rounded-full ${color.bg} transition ring-2 ring-offset-2 ${album.themeColor === color.id ? 'ring-brand-500 scale-110' : 'ring-transparent'}`}
+                                                ></button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="bg-white dark:bg-slate-800 p-5 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
+                                <div className="flex justify-between items-center">
+                                    <h3 className="font-semibold text-slate-800 dark:text-white text-sm">Gestionare Pagini ({album.pages.length})</h3>
+                                    <button 
+                                        onClick={addPage}
+                                        className="text-xs bg-brand-500 hover:bg-brand-600 text-white px-2.5 py-1 rounded-md font-medium transition flex items-center gap-1"
+                                    >
+                                        <i className="fa-solid fa-plus"></i> Pagină nouă
+                                    </button>
+                                </div>
+
+                                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                                    {album.pages.map((p, idx) => (
+                                        <div 
+                                            key={p.id}
+                                            onClick={() => setActivePageIdx(idx)}
+                                            className={`flex items-center justify-between p-2.5 rounded-lg border text-sm cursor-pointer transition ${activePageIdx === idx ? 'border-brand-500 bg-brand-50 dark:bg-brand-900/20 text-brand-700 dark:text-brand-300 font-medium' : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50'}`}
+                                        >
+                                            <span className="truncate flex-1 mr-2">{p.title}</span>
+                                            <span className="text-xs text-slate-400 mr-2">({p.photos.length} foto)</span>
+                                            {album.pages.length > 1 && (
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); deletePage(idx); }} 
+                                                    className="text-slate-400 hover:text-rose-500 p-1"
+                                                    title="Șterge Pagina"
+                                                >
+                                                    <i className="fa-solid fa-trash-can"></i>
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="lg:col-span-8 space-y-6">
+                            <div className={`print-page rounded-2xl shadow-lg p-8 md:p-12 text-white relative overflow-hidden transition-all duration-300 ${
+                                album.themeColor === 'indigo' ? 'bg-gradient-to-br from-indigo-700 to-purple-800' :
+                                album.themeColor === 'emerald' ? 'bg-gradient-to-br from-emerald-700 to-teal-900' :
+                                album.themeColor === 'rose' ? 'bg-gradient-to-br from-rose-600 to-red-800' :
+                                album.themeColor === 'amber' ? 'bg-gradient-to-br from-amber-600 to-orange-800' : 'bg-gradient-to-br from-slate-800 to-slate-950'
+                            }`}>
+                                <div className="relative z-10 max-w-xl">
+                                    <span className="text-xs uppercase tracking-widest bg-white/20 px-3 py-1 rounded-full backdrop-blur-md mb-4 inline-block font-semibold">
+                                        Album Foto Personalizat
+                                    </span>
+                                    <h1 className="text-3xl md:text-5xl font-serif font-bold tracking-tight mb-3 leading-tight">{album.title}</h1>
+                                    <p className="text-white/80 text-sm md:text-base font-light">{album.subtitle}</p>
+                                    <div className="mt-8 text-xs text-white/60 flex items-center gap-4">
+                                        <span><i className="fa-solid fa-layer-group mr-1"></i> {album.pages.length} pagini</span>
+                                        <span><i className="fa-solid fa-image mr-1"></i> {allPhotos.length} fotografii în total</span>
+                                    </div>
+                                </div>
+                                <i className="fa-solid fa-camera absolute -bottom-10 -right-10 text-white/10 text-9xl pointer-events-none"></i>
+                            </div>
+
+                            {album.pages[activePageIdx] && (
+                                <div className="print-page bg-white dark:bg-slate-800 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 p-6 md:p-8">
+                                    <div className="flex justify-between items-center mb-6 pb-4 border-b border-slate-100 dark:border-slate-700/60 no-print">
+                                        <input 
+                                            type="text" 
+                                            value={album.pages[activePageIdx].title} 
+                                            onChange={(e) => {
+                                                const updatedPages = [...album.pages];
+                                                updatedPages[activePageIdx].title = e.target.value;
+                                                setAlbum({ ...album, pages: updatedPages });
+                                            }}
+                                            className="text-xl font-bold bg-transparent text-slate-800 dark:text-white focus:ring-1 focus:ring-brand-500 rounded px-1 -ml-1 border-none outline-none w-full"
+                                        />
+                                    </div>
+
+                                    <h2 className="hidden print:block text-2xl font-bold mb-4">{album.pages[activePageIdx].title}</h2>
+
+                                    {album.pages[activePageIdx].photos.length === 0 ? (
+                                        <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl">
+                                            <i className="fa-solid fa-images text-4xl text-slate-300 mb-3"></i>
+                                            <p className="text-slate-500 text-sm">Această pagină nu are nicio fotografie.</p>
+                                            <p className="text-xs text-slate-400 mt-1">Folosește panoul din stânga pentru a adăuga imagini!</p>
+                                        </div>
+                                    ) : (
+                                        <div className={`
+                                            ${album.layoutType === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4' : ''}
+                                            ${album.layoutType === 'magazine' ? 'grid grid-cols-1 md:grid-cols-2 gap-6' : ''}
+                                            ${album.layoutType === 'polaroid' ? 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6' : ''}
+                                            ${album.layoutType === 'masonry' ? 'columns-1 sm:columns-2 md:columns-3 gap-4 space-y-4' : ''}
+                                            ${album.layoutType === 'scrapbook' ? 'flex flex-wrap justify-center gap-6' : ''}
+                                        `}>
+                                            {album.pages[activePageIdx].photos.map((photo, photoIdx) => (
+                                                <div 
+                                                    key={photo.id}
+                                                    className={`group relative transition-all duration-200 ${
+                                                        album.layoutType === 'polaroid' ? 'bg-white text-slate-800 p-3 pb-6 shadow-md border border-slate-200 rotate-1 hover:rotate-0 transform transition-transform' : ''
+                                                    } ${
+                                                        album.layoutType === 'scrapbook' ? 'bg-amber-50/80 dark:bg-slate-700 p-3 rounded-lg shadow-sm w-full md:w-64 rotate-[-2deg] hover:rotate-0' : ''
+                                                    } ${
+                                                        album.layoutType === 'magazine' && photoIdx === 0 ? 'md:col-span-2' : ''
+                                                    } ${
+                                                        album.layoutType === 'grid' || album.layoutType === 'masonry' ? 'bg-slate-50 dark:bg-slate-900 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700' : ''
+                                                    }`}
+                                                >
+                                                    <div className="overflow-hidden rounded-lg bg-black/5 relative">
+                                                        <img 
+                                                            src={photo.url} 
+                                                            alt={photo.caption} 
+                                                            style={{ transform: `rotate(${photo.rotation}deg)` }}
+                                                            className={`w-full object-cover transition-transform duration-300 ${photo.filter} ${
+                                                                album.layoutType === 'magazine' && photoIdx === 0 ? 'h-72 md:h-96' : 'h-48 md:h-56'
+                                                            }`}
+                                                        />
+
+                                                        <div className="no-print absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-2 transition duration-200">
+                                                            <button 
+                                                                onClick={() => setEditingPhoto(photo)}
+                                                                className="p-2 bg-white text-slate-800 rounded-full hover:bg-brand-500 hover:text-white transition shadow"
+                                                                title="Editează Filtru/Descriere"
+                                                            >
+                                                                <i className="fa-solid fa-pen"></i>
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => movePhoto(activePageIdx, photoIdx, -1)}
+                                                                disabled={photoIdx === 0}
+                                                                className="p-2 bg-white text-slate-800 rounded-full hover:bg-brand-500 hover:text-white disabled:opacity-50 transition shadow"
+                                                                title="Mută înapoi"
+                                                            >
+                                                                <i className="fa-solid fa-arrow-left"></i>
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => movePhoto(activePageIdx, photoIdx, 1)}
+                                                                disabled={photoIdx === album.pages[activePageIdx].photos.length - 1}
+                                                                className="p-2 bg-white text-slate-800 rounded-full hover:bg-brand-500 hover:text-white disabled:opacity-50 transition shadow"
+                                                                title="Mută înainte"
+                                                            >
+                                                                <i className="fa-solid fa-arrow-right"></i>
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => deletePhoto(photo.id)}
+                                                                className="p-2 bg-rose-600 text-white rounded-full hover:bg-rose-700 transition shadow"
+                                                                title="Șterge Foto"
+                                                            >
+                                                                <i className="fa-solid fa-trash"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    {photo.caption && (
+                                                        <div className="mt-2 px-1">
+                                                            <p className={`text-xs md:text-sm ${album.layoutType === 'polaroid' ? 'font-handwriting text-base text-center text-slate-700' : 'text-slate-600 dark:text-slate-300'}`}>
+                                                                {photo.caption}
+                                                            </p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {editingPhoto && (
+                        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+                            <div className="bg-white dark:bg-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-xl space-y-5 border border-slate-200 dark:border-slate-700">
+                                <div className="flex justify-between items-center border-b border-slate-200 dark:border-slate-700 pb-3">
+                                    <h3 className="font-bold text-lg text-slate-800 dark:text-white">Editare Imagini</h3>
+                                    <button onClick={() => setEditingPhoto(null)} className="text-slate-400 hover:text-slate-600">
+                                        <i className="fa-solid fa-xmark text-xl"></i>
+                                    </button>
+                                </div>
+
+                                <div className="overflow-hidden rounded-lg h-56 bg-slate-100 dark:bg-slate-900 flex items-center justify-center">
+                                    <img 
+                                        src={editingPhoto.url} 
+                                        alt="Preview" 
+                                        style={{ transform: `rotate(${editingPhoto.rotation}deg)` }}
+                                        className={`max-h-full max-w-full object-contain ${editingPhoto.filter}`} 
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">Descriere Imagine</label>
+                                    <input 
+                                        type="text" 
+                                        value={editingPhoto.caption} 
+                                        onChange={(e) => updatePhoto(editingPhoto.id, { caption: e.target.value })}
+                                        className="w-full px-3 py-2 text-sm border rounded-lg bg-slate-50 dark:bg-slate-900 border-slate-300 dark:border-slate-700 focus:ring-2 focus:ring-brand-500 outline-none"
+                                    />
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-2">Filtru Vizual</label>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {[
+                                            { id: 'filter-normal', label: 'Normal' },
+                                            { id: 'filter-grayscale', label: 'Alb-Negru' },
+                                            { id: 'filter-sepia', label: 'Sepia' },
+                                            { id: 'filter-vintage', label: 'Vintage' },
+                                            { id: 'filter-warm', label: 'Cald' },
+                                            { id: 'filter-dramatic', label: 'Dramatic' },
+                                        ].map(f => (
+                                            <button 
+                                                key={f.id}
+                                                onClick={() => updatePhoto(editingPhoto.id, { filter: f.id })}
+                                                className={`py-1.5 px-2 text-xs rounded-lg border transition ${editingPhoto.filter === f.id ? 'bg-brand-500 text-white border-brand-500' : 'bg-slate-50 dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-700'}`}
+                                            >
+                                                {f.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">Rotire Imagine</label>
+                                    <div className="flex gap-2">
+                                        <button 
+                                            onClick={() => updatePhoto(editingPhoto.id, { rotation: (editingPhoto.rotation - 90 + 360) % 360 })}
+                                            className="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-xs rounded-lg hover:bg-slate-200 transition flex items-center gap-1"
+                                        >
+                                            <i className="fa-solid fa-rotate-left"></i> -90°
+                                        </button>
+                                        <button 
+                                            onClick={() => updatePhoto(editingPhoto.id, { rotation: (editingPhoto.rotation + 90) % 360 })}
+                                            className="px-3 py-1.5 bg-slate-100 dark:bg-slate-700 text-xs rounded-lg hover:bg-slate-200 transition flex items-center gap-1"
+                                        >
+                                            <i className="fa-solid fa-rotate-right"></i> +90°
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="pt-2 border-t border-slate-200 dark:border-slate-700 flex justify-end">
+                                    <button 
+                                        onClick={() => setEditingPhoto(null)} 
+                                        className="px-4 py-2 bg-brand-500 hover:bg-brand-600 text-white rounded-lg text-sm font-medium transition"
+                                    >
+                                        Gata / Salvează
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {slideshowActive && allPhotos.length > 0 && (
+                        <div className="fixed inset-0 z-50 bg-black text-white flex flex-col items-center justify-between p-6">
+                            <div className="w-full max-w-5xl flex justify-between items-center z-10">
+                                <span className="text-sm font-medium text-white/70">
+                                    Imaginea {slideshowIdx + 1} din {allPhotos.length}
+                                </span>
+                                <button 
+                                    onClick={() => setSlideshowActive(false)} 
+                                    className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition"
+                                >
+                                    <i className="fa-solid fa-xmark text-xl"></i>
+                                </button>
+                            </div>
+
+                            <div className="relative max-w-4xl max-h-[75vh] flex items-center justify-center my-auto">
+                                <img 
+                                    src={allPhotos[slideshowIdx]?.url} 
+                                    alt={allPhotos[slideshowIdx]?.caption} 
+                                    style={{ transform: `rotate(${allPhotos[slideshowIdx]?.rotation || 0}deg)` }}
+                                    className={`max-h-[75vh] max-w-full object-contain shadow-2xl rounded-lg transition-all duration-300 ${allPhotos[slideshowIdx]?.filter}`}
+                                />
+                            </div>
+
+                            <div className="w-full max-w-xl text-center space-y-4 z-10">
+                                {allPhotos[slideshowIdx]?.caption && (
+                                    <p className="text-lg font-light text-white/90 bg-black/40 px-4 py-2 rounded-lg inline-block">
+                                        {allPhotos[slideshowIdx]?.caption}
+                                    </p>
+                                )}
+                                <div className="flex justify-center items-center gap-4">
+                                    <button 
+                                        onClick={() => setSlideshowIdx((prev) => (prev > 0 ? prev - 1 : allPhotos.length - 1))}
+                                        className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition"
+                                    >
+                                        <i className="fa-solid fa-chevron-left mr-1"></i> Anterioara
+                                    </button>
+                                    <button 
+                                        onClick={() => setSlideshowIdx((prev) => (prev < allPhotos.length - 1 ? prev + 1 : 0))}
+                                        className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition"
+                                    >
+                                        Următoarea <i className="fa-solid fa-chevron-right ml-1"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <footer className="no-print mt-auto border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-800 py-4 text-center text-xs text-slate-500">
+                        Proiect Individual — Generator de Albume Foto &bull; Realizat în React și Tailwind CSS
+                    </footer>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
